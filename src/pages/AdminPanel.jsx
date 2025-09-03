@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
-import { CheckCircle, XCircle, Eye, Clock, FileText, Users, AlertTriangle, Activity, Loader2, Trash2 } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, FileText, Users, AlertTriangle, Activity, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getPendingResources, updateResourceStatus, deleteAdminResource, getAllAdminResources } from '@/api/admin';
+import { getPendingResources, updateResourceStatus, deleteAdminResource } from '@/api/admin';
 
 const AdminPanel = () => {
   const { user, isAdmin, isAuthenticated } = useAuth();
@@ -25,41 +25,40 @@ const AdminPanel = () => {
   console.log('AdminPanel: Auth token:', localStorage.getItem('authToken')); 
 
   const fetchResources = async () => {
-  if (!isAuthenticated || !isAdmin) {
-    console.log('AdminPanel: Not authenticated or not admin, skipping fetch.');
-    setError('Access denied: Please log in as an admin.');
-    setIsLoading(false);
-    return;
-  }
+    if (!isAuthenticated || !isAdmin) {
+      console.log('AdminPanel: Not authenticated or not admin, skipping fetch.');
+      setError('Access denied: Please log in as an admin.');
+      setIsLoading(false);
+      return;
+    }
 
-  setIsLoading(true);
-  try {
-    console.log('AdminPanel: Fetching pending resources...');
-    const resources = await getPendingResources(localStorage.getItem('authToken')); // pass token
-    console.log('AdminPanel: Fetched resources:', JSON.stringify(resources, null, 2));
+    setIsLoading(true);
+    try {
+      console.log('AdminPanel: Fetching pending resources...');
+      const resources = await getPendingResources(localStorage.getItem('authToken'));
+      console.log('AdminPanel: Fetched resources:', JSON.stringify(resources, null, 2));
 
-    setPendingResources(Array.isArray(resources) ? resources : []);
-    toast({
-      title: 'Resources loaded',
-      description: `Fetched ${resources.length} resources.`,
-    });
-  } catch (error) {
-    console.error('AdminPanel: Failed to fetch resources:', JSON.stringify(error.response?.data || error.message, null, 2));
-    const errorMessage = error.response?.status === 403
-      ? 'Access denied: Admin privileges required. Please log out and log in with an admin account.'
-      : error.response?.data?.message || 'Could not fetch resources from the server.';
-    setError(errorMessage);
-    toast({
-      variant: 'destructive',
-      title: 'Failed to load resources',
-      description: errorMessage,
-    });
-    setPendingResources([]);
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+      setPendingResources(Array.isArray(resources) ? resources : []);
+      toast({
+        title: 'Resources loaded',
+        description: `Fetched ${resources.length} resources.`,
+      });
+    } catch (error) {
+      console.error('AdminPanel: Failed to fetch resources:', JSON.stringify(error.response?.data || error.message, null, 2));
+      const errorMessage = error.response?.status === 403
+        ? 'Access denied: Admin privileges required. Please log out and log in with an admin account.'
+        : error.response?.data?.message || 'Could not fetch resources from the server.';
+      setError(errorMessage);
+      toast({
+        variant: 'destructive',
+        title: 'Failed to load resources',
+        description: errorMessage,
+      });
+      setPendingResources([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated && isAdmin) {
@@ -166,8 +165,8 @@ const AdminPanel = () => {
     ).length,
     activeUsers: new Set(
       pendingResources
-        .filter(r => r.uploadedBy?.id)
-        .map(r => r.uploadedBy.id)
+        .filter(r => r.uploadedBy?._id) // Changed from uploadedBy.id
+        .map(r => r.uploadedBy._id) // Changed from uploadedBy.id
     ).size
   };
 
@@ -181,8 +180,8 @@ const AdminPanel = () => {
             variant="outline"
             className="mt-4"
             onClick={() => {
-              localStorage.removeItem('authToken'); // Changed to localStorage
-              localStorage.removeItem('user'); // Changed to localStorage
+              localStorage.removeItem('authToken');
+              localStorage.removeItem('user');
               navigate('/login');
             }}
           >
@@ -299,7 +298,7 @@ const AdminPanel = () => {
                     </div>
                   ) : (
                     pendingResources.filter(r => r.status === 'pending').map((resource) => (
-                      <Card key={resource.id} className="border-yellow-500/20">
+                      <Card key={resource._id} className="border-yellow-500/20">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex-1">
@@ -310,20 +309,20 @@ const AdminPanel = () => {
                               <p className="text-muted-foreground mb-3">{resource.description || 'No description'}</p>
                               <div className="grid md:grid-cols-2 gap-4 text-sm">
                                 <div>
-                                  <span className="font-medium">Category:</span> {resource.category || 'N/A'}
+                                  <span className="font-medium">Category:</span> {resource.type || 'N/A'}
                                 </div>
                                 <div>
                                   <span className="font-medium">Subject:</span> {resource.subject || 'N/A'}
                                 </div>
                                 <div>
-                                  <span className="font-medium">Uploaded By:</span> {resource.uploadedBy?.email || 'N/A'} ({resource.uploadedBy?.alias || 'N/A'})
+                                  <span className="font-medium">Uploaded By:</span> {resource.uploadedBy?.email || 'N/A'} ({resource.uploadedBy?.name || 'N/A'})
                                 </div>
                                 <div>
                                   <span className="font-medium">Upload Date:</span> {resource.createdAt ? new Date(resource.createdAt).toLocaleDateString() : 'N/A'}
                                 </div>
-                                {resource.files && resource.files.length > 0 ? (
+                                {resource.file ? (
                                   <div>
-                                    <span className="font-medium">File:</span> {resource.files[0].originalname || 'N/A'}
+                                    <span className="font-medium">File:</span> {resource.file || 'N/A'}
                                   </div>
                                 ) : (
                                   <div>
@@ -338,7 +337,7 @@ const AdminPanel = () => {
                               variant="success"
                               size="sm"
                               className="gap-2 bg-green-500 hover:bg-green-600"
-                              onClick={() => handleApprove(resource.id)}
+                              onClick={() => handleApprove(resource._id)}
                             >
                               <CheckCircle className="w-4 h-4" />
                               Approve
@@ -347,7 +346,7 @@ const AdminPanel = () => {
                               variant="destructive"
                               size="sm"
                               className="gap-2 bg-red-500 hover:bg-red-600"
-                              onClick={() => handleReject(resource.id)}
+                              onClick={() => handleReject(resource._id)}
                             >
                               <XCircle className="w-4 h-4" />
                               Reject
@@ -356,7 +355,7 @@ const AdminPanel = () => {
                               variant="ghost"
                               size="sm"
                               className="gap-2 text-red-500 hover:text-red-600"
-                              onClick={() => handleDelete(resource.id)}
+                              onClick={() => handleDelete(resource._id)}
                             >
                               <Trash2 className="w-4 h-4" />
                               Delete
@@ -375,7 +374,7 @@ const AdminPanel = () => {
                     <p className="text-center text-muted-foreground py-4">No approved resources.</p>
                   ) : (
                     pendingResources.filter(r => r.status === 'approved').map((resource) => (
-                      <Card key={resource.id} className="border-green-500/20">
+                      <Card key={resource._id} className="border-green-500/20">
                         <CardContent className="p-6">
                           <div className="flex items-center justify-between">
                             <div>
@@ -384,7 +383,7 @@ const AdminPanel = () => {
                                 {getStatusBadge(resource.status)}
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                By {resource.uploadedBy?.alias || 'N/A'} • Approved on {resource.updatedAt ? new Date(resource.updatedAt).toLocaleDateString() : 'N/A'}
+                                By {resource.uploadedBy?.name || 'N/A'} • Approved on {resource.updatedAt ? new Date(resource.updatedAt).toLocaleDateString() : 'N/A'}
                               </p>
                             </div>
                             <div className="flex gap-3">
@@ -392,7 +391,7 @@ const AdminPanel = () => {
                                 variant="ghost"
                                 size="sm"
                                 className="gap-2 text-red-500 hover:text-red-600"
-                                onClick={() => handleDelete(resource.id)}
+                                onClick={() => handleDelete(resource._id)}
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Delete
@@ -412,7 +411,7 @@ const AdminPanel = () => {
                     <p className="text-center text-muted-foreground py-4">No rejected resources.</p>
                   ) : (
                     pendingResources.filter(r => r.status === 'rejected').map((resource) => (
-                      <Card key={resource.id} className="border-red-500/20">
+                      <Card key={resource._id} className="border-red-500/20">
                         <CardContent className="p-6">
                           <div className="flex items-center justify-between">
                             <div>
@@ -421,7 +420,7 @@ const AdminPanel = () => {
                                 {getStatusBadge(resource.status)}
                               </div>
                               <p className="text-sm text-muted-foreground">
-                                By {resource.uploadedBy?.alias || 'N/A'} • Rejected on {resource.updatedAt ? new Date(resource.updatedAt).toLocaleDateString() : 'N/A'}
+                                By {resource.uploadedBy?.name || 'N/A'} • Rejected on {resource.updatedAt ? new Date(resource.updatedAt).toLocaleDateString() : 'N/A'}
                               </p>
                             </div>
                             <div className="flex gap-3">
@@ -429,7 +428,7 @@ const AdminPanel = () => {
                                 variant="ghost"
                                 size="sm"
                                 className="gap-2 text-red-500 hover:text-red-600"
-                                onClick={() => handleDelete(resource.id)}
+                                onClick={() => handleDelete(resource._id)}
                               >
                                 <Trash2 className="w-4 h-4" />
                                 Delete

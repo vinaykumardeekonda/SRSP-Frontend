@@ -1,25 +1,29 @@
-import axiosInstance from "../axiosConfig";
+import axiosInstance from '../axiosConfig';
 
 export const getAllAdminResources = async () => {
-  const response = await fetch('http://localhost:3001/api/admin/resources/pending', {
-    method: 'GET',
-    credentials: 'include', // sends cookies
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to fetch admin resources');
+  try {
+    const response = await axiosInstance.get('/api/admin/resources/pending');
+    console.log('admin.js: Fetched all admin resources:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('admin.js: Error fetching all admin resources:', error.response?.status, error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch admin resources');
   }
-  return await response.json();
 };
 
-// Using axios instance with cookies sent automatically
-export const getPendingResources = async () => {
-  const response = await axiosInstance.get('/api/admin/resources/pending');
-  return response.data;
+export const getPendingResources = async (token) => {
+  try {
+    const response = await axiosInstance.get('/api/admin/resources/pending', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    console.log('admin.js: Fetched pending resources:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('admin.js: Error fetching pending resources:', error.response?.status, error.response?.data || error.message);
+    throw new Error(error.response?.data?.message || 'Failed to fetch pending resources');
+  }
 };
 
 export const updateResourceStatus = async (resourceId, status) => {
@@ -29,7 +33,7 @@ export const updateResourceStatus = async (resourceId, status) => {
     return response.data;
   } catch (error) {
     console.error('admin.js: Error updating resource status:', error.response?.status, error.response?.data || error.message);
-    throw error;
+    throw new Error(error.response?.data?.message || 'Failed to update resource status');
   }
 };
 
@@ -40,6 +44,6 @@ export const deleteAdminResource = async (resourceId) => {
     return response.data;
   } catch (error) {
     console.error('admin.js: Error deleting resource:', error.response?.status, error.response?.data || error.message);
-    throw error;
+    throw new Error(error.response?.data?.message || 'Failed to delete resource');
   }
 };
